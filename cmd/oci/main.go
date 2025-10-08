@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"ociclean/harbor"
 	"ociclean/oci"
 	"os"
 
@@ -12,13 +13,15 @@ import (
 )
 
 type options struct {
-	registry string
+	registry   string
+	harborRobo string
 }
 
 func getOptions(args []string) (*options, error) {
 	opts := new(options)
 	fs := flag.NewFlagSet(args[0], flag.ExitOnError)
 	fs.StringVar(&opts.registry, "registry", "", "image registryname, tag is ignored")
+	fs.StringVar(&opts.harborRobo, "harbor-robo", "", "harbor robo account json")
 
 	err := fs.Parse(args[1:])
 	if err != nil {
@@ -33,15 +36,35 @@ func printImages(w io.Writer, images []oci.ImageInfo) {
 	}
 }
 
+func getAuthn(opts *options) (authn.Authenticator, error) {
+	if opts.harborRobo == "" {
+		return nil, nil
+	}
+	a, err := harbor.ReadSecret(opts.harborRobo)
+	if err != nil {
+		return nil, err
+	}
+	return harbor.BasicAuth(a), nil
+}
+
 func run(args []string) error {
 	opts, err := getOptions(args)
 	if err != nil {
 		return err
 	}
 
+	creds, err := getAuthn(opts)
+	if err != nil  {
+		return err
+	}
+	
+	var remoteOption remote.Option = remote.WithAuthFromKeychain(authn.DefaultKeychain)
+	if creds != nil {
+		remoteOption = remote.WithAuth(creds)
+	} 
+
 	// create the key chain with docker file creds
-	kc := authn.DefaultKeychain
-	images, err := oci.ListImageInfo(opts.registry, oci.WithRemoteOption(remote.WithAuthFromKeychain(kc)))
+	images, err := oci.ListImageInfo(opts.registry, oci.WithRemoteOption(remoteOption))
 	if err != nil {
 		return err
 	}
@@ -58,4 +81,3 @@ func main() {
 	}
 	os.Exit(0)
 }
-

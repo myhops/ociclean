@@ -3,3 +3,5 @@
 A package with CLIs to easily clean up images that are not necessary.
 It scans the images that are deployed in a Kubernetes cluster and compares it with the available images in a, private, registry.
 It allows you to create a list of images that are not used and can be cleaned up.
+
+== 
